@@ -1,6 +1,6 @@
 # Implementation Plan
 
-- [ ] 1. Create minimal working Fastify server with health check
+- [x] 1. Create minimal working Fastify server with health check
 
   - Set up TypeScript project with Fastify framework
   - Create basic project structure (src/, package.json, tsconfig.json)
@@ -9,7 +9,7 @@
   - **Deliverable**: Running server on localhost that responds to health check
   - _Requirements: 1.1_
 
-- [ ] 2. Add POST /validate-address endpoint with mock response
+- [x] 2. Add POST /validate-address endpoint with mock response
 
   - Define core TypeScript interfaces (AddressValidationRequest, AddressValidationResponse, ValidatedAddress)
   - Create POST /validate-address endpoint that accepts {"address": "string"}
