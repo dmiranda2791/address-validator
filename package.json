@@ -17,6 +17,7 @@
   "author": "",
   "license": "MIT",
   "dependencies": {
+    "dotenv": "^17.2.1",
     "fastify": "^4.24.3",
     "opossum": "^9.0.0",
     "smartystreets-javascript-sdk": "^7.0.1"

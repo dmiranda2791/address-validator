@@ -37,7 +37,7 @@
   - **Deliverable**: SmartyAddressProvider returns properly formatted internal responses
   - _Requirements: 2.1, 2.2, 2.3, 2.4_
 
-- [ ] 5. Connect SmartyAddressProvider to API endpoint
+- [x] 5. Connect SmartyAddressProvider to API endpoint
 
   - Create AddressValidationService that orchestrates the validation workflow
   - Replace mock response in POST /validate-address with real SmartyAddressProvider calls

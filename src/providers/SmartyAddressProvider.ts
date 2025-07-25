@@ -28,15 +28,15 @@ export class SmartyAddressProvider implements ValidationProviderAdapter {
 
   constructor(config: SmartyConfig, circuitBreakerConfig: CircuitBreakerConfig) {
     this.config = config;
-    
+
     // Initialize Smarty SDK client
     const credentials = new SmartyStreets.core.StaticCredentials(config.authId, config.authToken);
     const clientBuilder = new SmartyStreets.core.ClientBuilder(credentials);
-    
+
     if (config.licenses && config.licenses.length > 0) {
       clientBuilder.withLicenses(config.licenses);
     }
-    
+
     this.smartyClient = clientBuilder.buildUsStreetApiClient();
 
     // Initialize Opossum circuit breaker wrapping Smarty API calls
@@ -62,7 +62,7 @@ export class SmartyAddressProvider implements ValidationProviderAdapter {
 
   async validateAddress(address: string): Promise<AddressValidationResponse> {
     const startTime = Date.now();
-    
+
     try {
       // Call Smarty SDK through circuit breaker
       const smartyResponse = await this.circuitBreaker.fire(address);
@@ -79,10 +79,10 @@ export class SmartyAddressProvider implements ValidationProviderAdapter {
 
       // Use the first candidate (most likely match)
       const candidate = smartyResponse[0];
-      
+
       // Map Smarty response to internal format
       const validatedAddress = this.mapToValidatedAddress(candidate);
-      
+
       // Determine validation status using analysis data
       const status = this.determineValidationStatus(candidate, address);
 
@@ -98,38 +98,28 @@ export class SmartyAddressProvider implements ValidationProviderAdapter {
 
     } catch (error) {
       // Handle circuit breaker open state and other errors
-      return this.handleCircuitBreakerError(error as Error, address, Date.now() - startTime);
+      return this.handleCircuitBreakerError(error as Error, address);
     }
   }
 
   private async callSmartyAPI(address: string): Promise<SmartyStreets.usStreet.Candidate[]> {
     const lookup = new SmartyStreets.usStreet.Lookup();
     lookup.street = address;
-    
+
     if (this.config.maxCandidates) {
       lookup.maxCandidates = this.config.maxCandidates;
     }
 
-    return new Promise((resolve, reject) => {
-      this.smartyClient.send(lookup).then((batch) => {
-        if (lookup.result && lookup.result.length > 0) {
-          resolve(lookup.result);
-        } else {
-          resolve([]);
-        }
-      }).catch((error) => {
-        reject(error);
-      });
-    });
+    await this.smartyClient.send(lookup);
+    return lookup.result || [];
   }
 
   private handleCircuitBreakerError(
     error: Error,
-    address: string,
-    processingTime: number
+    address: string
   ): AddressValidationResponse {
     let errorMessage = 'Address validation service temporarily unavailable';
-    
+
     if ((error as NodeJS.ErrnoException).code === 'EOPENBREAKER') {
       errorMessage = 'Address validation service is experiencing issues - please try again later';
     } else if ('timeout' in error) {
@@ -148,7 +138,7 @@ export class SmartyAddressProvider implements ValidationProviderAdapter {
     originalInput: string
   ): ValidationStatus {
     const analysis = candidate.analysis;
-    
+
     // Empty array response handled in main method
     if (!analysis) {
       return 'invalid';
@@ -188,7 +178,7 @@ export class SmartyAddressProvider implements ValidationProviderAdapter {
 
   private mapToValidatedAddress(candidate: SmartyStreets.usStreet.Candidate): ValidatedAddress {
     const components = candidate.components;
-    
+
     return {
       street: this.buildStreetName(components),
       number: components.primaryNumber || '',
@@ -205,21 +195,21 @@ export class SmartyAddressProvider implements ValidationProviderAdapter {
       components.streetSuffix,
       components.streetPostdirection
     ].filter(Boolean);
-    
+
     return parts.join(' ');
   }
 
 
   private hasAddressCorrections(originalInput: string, candidate: SmartyStreets.usStreet.Candidate): boolean {
     // Create a full standardized address from Smarty response
-    const standardizedFull = candidate.deliveryLine1 + 
-      (candidate.deliveryLine2 ? ` ${candidate.deliveryLine2}` : '') + 
+    const standardizedFull = candidate.deliveryLine1 +
+      (candidate.deliveryLine2 ? ` ${candidate.deliveryLine2}` : '') +
       `, ${candidate.lastLine}`;
-    
+
     // Normalize both addresses for comparison
     const normalizedOriginal = this.normalizeAddressForComparison(originalInput);
     const normalizedStandardized = this.normalizeAddressForComparison(standardizedFull);
-    
+
     // Check if there are significant differences
     return normalizedOriginal !== normalizedStandardized;
   }
