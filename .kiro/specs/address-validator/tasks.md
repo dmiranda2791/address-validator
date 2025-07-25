@@ -65,6 +65,7 @@
   - _Requirements: 1.1, 1.2, 1.3, 2.1, 2.2, 2.3, 2.4, 3.1, 3.2, 3.3, 4.1, 4.2, 4.3_
 
 - [ ] 8. Add production readiness features
+
   - Implement structured logging throughout the application
   - Add request/response logging middleware (without sensitive data)
   - Add rate limiting middleware
@@ -72,3 +73,20 @@
   - Configure graceful shutdown handling
   - **Deliverable**: Production-ready API with logging, security, and monitoring
   - _Requirements: 4.2, 4.3, 6.1, 6.2, 6.3_
+
+- [ ] 9. Create comprehensive README documentation
+  - Write project overview and purpose
+  - Document design decisions and their benefits:
+    - Adapter Pattern: Enables easy switching between validation providers, isolates external dependencies, makes testing easier with mocked implementations
+    - Circuit Breaker: Prevents cascading failures, provides graceful degradation during outages, automatic recovery, protects against external API instability
+    - Rate Limiting: Prevents API abuse, ensures fair usage, protects server resources, improves overall system stability
+    - Smarty SDK Usage: Built-in retry logic, official support and updates, simplified integration, handles authentication and request formatting
+  - Add setup and installation instructions
+  - Include API usage examples with curl commands
+  - Document configuration options and environment variables
+  - Add troubleshooting section
+  - Create Future Work section including:
+    - Dockerization: Consistent deployment environments, easier scaling, simplified CI/CD, environment isolation, reproducible builds
+    - Authentication & Authorization with JWTs: Secure API access, user-specific rate limiting, audit trails, role-based permissions
+  - **Deliverable**: Complete project documentation for developers and operators
+  - _Requirements: All requirements for comprehensive project documentation_
