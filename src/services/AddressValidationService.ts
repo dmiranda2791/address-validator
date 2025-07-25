@@ -1,4 +1,5 @@
 import { ValidationProviderAdapter, AddressValidationResponse } from '../types';
+import { InvalidAddressError } from '../errors';
 
 export class AddressValidationService {
   private provider: ValidationProviderAdapter;
@@ -10,24 +11,13 @@ export class AddressValidationService {
   async validateAddress(address: string): Promise<AddressValidationResponse> {
     // Validate input
     if (!address || typeof address !== 'string' || address.trim().length === 0) {
-      return {
-        status: 'invalid',
-        original: address,
-        errors: ['Address is required and must be a non-empty string']
-      };
+      throw new InvalidAddressError('Address is required and must be a non-empty string', {
+        originalAddress: address,
+        validationType: 'input'
+      });
     }
 
-    try {
-      // Delegate to the provider
-      const result = await this.provider.validateAddress(address.trim());
-      return result;
-    } catch (error) {
-      // Handle any unexpected errors
-      return {
-        status: 'invalid',
-        original: address,
-        errors: ['Address validation failed due to an internal error']
-      };
-    }
+    // Delegate to the provider - let any errors bubble up
+    return await this.provider.validateAddress(address.trim());
   }
 }

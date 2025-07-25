@@ -6,6 +6,12 @@ import {
   ValidatedAddress,
   ValidationStatus
 } from '../types';
+import { 
+  CircuitBreakerError, 
+  TimeoutError, 
+  ExternalServiceError,
+  InvalidAddressError 
+} from '../errors';
 
 interface SmartyConfig {
   authId: string;
@@ -61,20 +67,17 @@ export class SmartyAddressProvider implements ValidationProviderAdapter {
   }
 
   async validateAddress(address: string): Promise<AddressValidationResponse> {
-    const startTime = Date.now();
-
     try {
       // Call Smarty SDK through circuit breaker
       const smartyResponse = await this.circuitBreaker.fire(address);
-      const processingTime = Date.now() - startTime;
 
       // Handle empty array responses (invalid addresses)
       if (!smartyResponse || smartyResponse.length === 0) {
-        return {
-          status: 'invalid',
-          original: address,
-          errors: ['Address could not be validated']
-        };
+        throw new InvalidAddressError('Address could not be validated', {
+          originalAddress: address,
+          provider: 'smarty',
+          reason: 'no_candidates_returned'
+        });
       }
 
       // Use the first candidate (most likely match)
@@ -97,8 +100,8 @@ export class SmartyAddressProvider implements ValidationProviderAdapter {
       return response;
 
     } catch (error) {
-      // Handle circuit breaker open state and other errors
-      return this.handleCircuitBreakerError(error as Error, address);
+      // Transform external errors to domain errors
+      this.handleAndThrowError(error as Error, address);
     }
   }
 
@@ -114,23 +117,39 @@ export class SmartyAddressProvider implements ValidationProviderAdapter {
     return lookup.result || [];
   }
 
-  private handleCircuitBreakerError(
-    error: Error,
-    address: string
-  ): AddressValidationResponse {
-    let errorMessage = 'Address validation service temporarily unavailable';
-
-    if ((error as NodeJS.ErrnoException).code === 'EOPENBREAKER') {
-      errorMessage = 'Address validation service is experiencing issues - please try again later';
-    } else if ('timeout' in error) {
-      errorMessage = 'Address validation request timed out';
+  private handleAndThrowError(error: Error, address: string): never {
+    // Check if it's already one of our domain errors and re-throw
+    if (error instanceof InvalidAddressError || 
+        error instanceof CircuitBreakerError || 
+        error instanceof TimeoutError || 
+        error instanceof ExternalServiceError) {
+      throw error;
     }
 
-    return {
-      status: 'invalid',
-      original: address,
-      errors: [errorMessage]
-    };
+    // Transform circuit breaker errors
+    if ((error as NodeJS.ErrnoException).code === 'EOPENBREAKER') {
+      throw new CircuitBreakerError('Address validation service is experiencing issues - please try again later', {
+        originalAddress: address,
+        provider: 'smarty',
+        circuitBreakerState: 'open'
+      });
+    }
+
+    // Transform timeout errors
+    if ('timeout' in error || error.message.includes('timeout')) {
+      throw new TimeoutError('Address validation request timed out', {
+        originalAddress: address,
+        provider: 'smarty'
+      });
+    }
+
+    // Transform other external service errors
+    throw new ExternalServiceError(`Smarty API error: ${error.message}`, {
+      originalAddress: address,
+      provider: 'smarty',
+      originalError: error.message,
+      stack: error.stack
+    });
   }
 
   private determineValidationStatus(

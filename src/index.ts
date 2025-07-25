@@ -4,8 +4,10 @@ import { ValidateAddressRequest } from './types';
 import { AddressValidationService } from './services/AddressValidationService';
 import { SmartyAddressProvider } from './providers/SmartyAddressProvider';
 import { loadConfig } from './config';
+import { createErrorHandler, setupGlobalErrorHandlers } from './middleware/errorHandler';
+import { InvalidRequestError, InvalidAddressError } from './errors';
 
-// Load configuration
+// Load configuration - configuration errors will be thrown and cause startup to fail
 const config = loadConfig();
 
 // Initialize provider and service
@@ -13,8 +15,15 @@ const smartyProvider = new SmartyAddressProvider(config.smarty, config.circuitBr
 const validationService = new AddressValidationService(smartyProvider);
 
 const fastify = Fastify({
-  logger: true
+  logger: true,
+  genReqId: () => Math.random().toString(36).substring(2, 15)
 });
+
+// Setup global error handlers
+setupGlobalErrorHandlers(fastify.log);
+
+// Register centralized error handler
+fastify.setErrorHandler(createErrorHandler(fastify.log));
 
 // Health check endpoint
 fastify.get('/health', async () => {
@@ -23,58 +32,27 @@ fastify.get('/health', async () => {
 
 // Address validation endpoint
 fastify.post<{ Body: ValidateAddressRequest }>('/validate-address', async (request, reply) => {
-  try {
-    // Basic request validation
-    if (!request.body || typeof request.body !== 'object') {
-      reply.status(400);
-      return {
-        error: {
-          code: 'INVALID_REQUEST',
-          message: 'Request body is required',
-          timestamp: new Date().toISOString(),
-          requestId: request.id
-        }
-      };
-    }
-
-    const { address } = request.body;
-
-    if (!address || typeof address !== 'string' || address.trim().length === 0) {
-      reply.status(400);
-      return {
-        error: {
-          code: 'INVALID_ADDRESS',
-          message: 'Address field is required and must be a non-empty string',
-          timestamp: new Date().toISOString(),
-          requestId: request.id
-        }
-      };
-    }
-
-    // Use real address validation service
-    const result = await validationService.validateAddress(address);
-    
-    // Set appropriate HTTP status based on validation result
-    if (result.status === 'invalid' && result.errors && result.errors.length > 0) {
-      reply.status(400);
-    } else {
-      reply.status(200);
-    }
-
-    return result;
-
-  } catch (error) {
-    // Handle unexpected errors
-    reply.status(500);
-    return {
-      error: {
-        code: 'INTERNAL_ERROR',
-        message: 'Internal server error occurred during address validation',
-        timestamp: new Date().toISOString(),
-        requestId: request.id
-      }
-    };
+  // Basic request validation - throw errors, let centralized handler deal with them
+  if (!request.body || typeof request.body !== 'object') {
+    throw new InvalidRequestError('Request body is required', {
+      bodyReceived: request.body
+    }, request.id);
   }
+
+  const { address } = request.body;
+
+  if (!address || typeof address !== 'string' || address.trim().length === 0) {
+    throw new InvalidAddressError('Address field is required and must be a non-empty string', {
+      addressReceived: address,
+      addressType: typeof address
+    }, request.id);
+  }
+
+  // Use real address validation service - let any errors bubble up
+  const result = await validationService.validateAddress(address);
+  
+  // Return successful result - no need to manually set status codes
+  return result;
 });
 
 const start = async () => {

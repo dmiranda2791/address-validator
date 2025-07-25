@@ -21,10 +21,14 @@ interface AppConfig {
   };
 }
 
+import { ConfigurationError } from '../errors';
+
 function validateRequiredEnvVar(name: string): string {
   const value = process.env[name];
   if (!value) {
-    throw new Error(`Required environment variable ${name} is not set`);
+    throw new ConfigurationError(`Required environment variable ${name} is not set`, {
+      envVarName: name
+    });
   }
   return value;
 }
@@ -39,7 +43,11 @@ function getEnvVarAsNumber(name: string, defaultValue: number): number {
   
   const parsed = parseInt(value, 10);
   if (isNaN(parsed)) {
-    throw new Error(`Environment variable ${name} must be a valid number, got: ${value}`);
+    throw new ConfigurationError(`Environment variable ${name} must be a valid number, got: ${value}`, {
+      envVarName: name,
+      envVarValue: value,
+      expectedType: 'number'
+    });
   }
   return parsed;
 }
@@ -52,33 +60,28 @@ function getEnvVarAsArray(name: string, defaultValue: string[] = []): string[] {
 }
 
 export function loadConfig(): AppConfig {
-  try {
-    return {
-      server: {
-        port: getEnvVarAsNumber('PORT', 3000),
-        host: getEnvVar('HOST', 'localhost'),
-      },
-      smarty: {
-        authId: validateRequiredEnvVar('SMARTY_AUTH_ID'),
-        authToken: validateRequiredEnvVar('SMARTY_AUTH_TOKEN'),
-        licenses: getEnvVarAsArray('SMARTY_LICENSES', ['us-core-cloud']),
-        maxCandidates: getEnvVarAsNumber('SMARTY_MAX_CANDIDATES', 1),
-        matchStrategy: (getEnvVar('SMARTY_MATCH_STRATEGY', 'strict') as 'strict' | 'invalid' | 'enhanced'),
-      },
-      circuitBreaker: {
-        timeout: getEnvVarAsNumber('CIRCUIT_BREAKER_TIMEOUT', 10000),
-        errorThresholdPercentage: getEnvVarAsNumber('CIRCUIT_BREAKER_ERROR_THRESHOLD', 50),
-        resetTimeout: getEnvVarAsNumber('CIRCUIT_BREAKER_RESET_TIMEOUT', 30000),
-      },
-      logging: {
-        level: getEnvVar('LOG_LEVEL', 'info'),
-        format: getEnvVar('LOG_FORMAT', 'json'),
-      },
-    };
-  } catch (error) {
-    console.error('Configuration validation failed:', error);
-    process.exit(1);
-  }
+  return {
+    server: {
+      port: getEnvVarAsNumber('PORT', 3000),
+      host: getEnvVar('HOST', 'localhost'),
+    },
+    smarty: {
+      authId: validateRequiredEnvVar('SMARTY_AUTH_ID'),
+      authToken: validateRequiredEnvVar('SMARTY_AUTH_TOKEN'),
+      licenses: getEnvVarAsArray('SMARTY_LICENSES', ['us-core-cloud']),
+      maxCandidates: getEnvVarAsNumber('SMARTY_MAX_CANDIDATES', 1),
+      matchStrategy: (getEnvVar('SMARTY_MATCH_STRATEGY', 'strict') as 'strict' | 'invalid' | 'enhanced'),
+    },
+    circuitBreaker: {
+      timeout: getEnvVarAsNumber('CIRCUIT_BREAKER_TIMEOUT', 10000),
+      errorThresholdPercentage: getEnvVarAsNumber('CIRCUIT_BREAKER_ERROR_THRESHOLD', 50),
+      resetTimeout: getEnvVarAsNumber('CIRCUIT_BREAKER_RESET_TIMEOUT', 30000),
+    },
+    logging: {
+      level: getEnvVar('LOG_LEVEL', 'info'),
+      format: getEnvVar('LOG_FORMAT', 'json'),
+    },
+  };
 }
 
 export type { AppConfig };
