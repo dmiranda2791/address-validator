@@ -41,6 +41,54 @@ Built-in rate limiting using Fastify's rate-limit plugin protects the service fr
 
 The official Smarty JavaScript SDK provides robust error handling, automatic retries, and simplified authentication. This reduces the complexity of our integration code and ensures we benefit from Smarty's best practices and updates.
 
+## AI-Assisted Development
+
+This project was developed using a spec-driven development approach with AI assistance, demonstrating modern development workflows that combine human expertise with AI capabilities.
+
+### Development Workflow
+
+**1. Specification Phase with Kiro IDE + Claude Sonnet 4.0**
+
+- Generated initial `requirements.md` with structured user stories and EARS format acceptance criteria
+- Created comprehensive `design.md` covering architecture, components, data models, and testing strategy
+- Developed detailed `tasks.md` with incremental implementation steps and requirement traceability
+- Iteratively refined specifications based on architectural patterns and best practices input
+
+**2. Implementation Phase with Claude Code**
+
+- Executed individual tasks independently, focusing on one component at a time
+- Maintained consistency with the established design patterns and requirements
+- Implemented comprehensive test coverage alongside feature development
+- Applied TypeScript best practices and production-ready error handling
+
+### AI Integration Benefits
+
+**Specification Quality**: AI assistance helped create comprehensive, well-structured requirements and design documents that served as reliable implementation guides throughout the project.
+
+**Pattern Implementation**: AI effectively implemented established architectural patterns (Adapter, Circuit Breaker) with proper abstractions and error handling, reducing development time while maintaining code quality.
+
+**Test Coverage**: AI generated thorough unit and integration tests that validate both happy path and edge case scenarios, ensuring robust code quality.
+
+**Documentation Consistency**: AI maintained consistent documentation standards across code comments, API documentation, and this README, improving long-term maintainability.
+
+### Human-AI Collaboration
+
+The development process leveraged human expertise for:
+
+- Architectural decision-making and pattern selection
+- Requirements refinement and business logic validation
+- Code review and quality assurance
+- Strategic technical decisions and trade-off evaluation
+
+While AI contributed:
+
+- Rapid code generation following established patterns
+- Comprehensive test suite creation
+- Detailed documentation and error handling
+- Consistent implementation of design specifications
+
+This hybrid approach demonstrates how AI can accelerate development velocity while maintaining high code quality and architectural integrity when guided by experienced developers.
+
 ## Quick Start
 
 ### Prerequisites
