@@ -2,10 +2,8 @@ import CircuitBreaker from 'opossum';
 import * as SmartyStreets from 'smartystreets-javascript-sdk';
 import {
   ValidationProviderAdapter,
-  ProviderValidationResult,
-  SmartyAddressResponse,
-  StandardizedAddress,
-  AddressCorrection,
+  AddressValidationResponse,
+  ValidatedAddress,
   ValidationStatus
 } from '../types';
 
@@ -62,7 +60,7 @@ export class SmartyAddressProvider implements ValidationProviderAdapter {
     });
   }
 
-  async validateAddress(address: string): Promise<ProviderValidationResult> {
+  async validateAddress(address: string): Promise<AddressValidationResponse> {
     const startTime = Date.now();
     
     try {
@@ -74,12 +72,8 @@ export class SmartyAddressProvider implements ValidationProviderAdapter {
       if (!smartyResponse || smartyResponse.length === 0) {
         return {
           status: 'invalid',
-          originalInput: address,
-          errors: ['Address could not be validated'],
-          metadata: {
-            provider: 'smarty',
-            processingTime,
-          }
+          original: address,
+          errors: ['Address could not be validated']
         };
       }
 
@@ -87,24 +81,20 @@ export class SmartyAddressProvider implements ValidationProviderAdapter {
       const candidate = smartyResponse[0];
       
       // Map Smarty response to internal format
-      const standardizedAddress = this.mapToStandardizedAddress(candidate);
+      const validatedAddress = this.mapToValidatedAddress(candidate);
       
       // Determine validation status using analysis data
       const status = this.determineValidationStatus(candidate, address);
-      
-      // Extract corrections if any
-      const corrections = this.extractCorrections(address, candidate);
 
-      return {
+      // Create the response
+      const response: AddressValidationResponse = {
         status,
-        standardizedAddress,
-        originalInput: address,
-        corrections,
-        metadata: {
-          provider: 'smarty',
-          processingTime,
-        }
+        original: address,
+        validated: validatedAddress,
+        errors: []
       };
+
+      return response;
 
     } catch (error) {
       // Handle circuit breaker open state and other errors
@@ -137,7 +127,7 @@ export class SmartyAddressProvider implements ValidationProviderAdapter {
     error: Error,
     address: string,
     processingTime: number
-  ): ProviderValidationResult {
+  ): AddressValidationResponse {
     let errorMessage = 'Address validation service temporarily unavailable';
     
     if ((error as NodeJS.ErrnoException).code === 'EOPENBREAKER') {
@@ -148,12 +138,8 @@ export class SmartyAddressProvider implements ValidationProviderAdapter {
 
     return {
       status: 'invalid',
-      originalInput: address,
-      errors: [errorMessage],
-      metadata: {
-        provider: 'smarty',
-        processingTime,
-      }
+      original: address,
+      errors: [errorMessage]
     };
   }
 
@@ -191,10 +177,8 @@ export class SmartyAddressProvider implements ValidationProviderAdapter {
 
     // If base status is 'valid', check if any corrections were made
     if (baseStatus === 'valid') {
-      const standardizedInput = this.formatAddressForComparison(candidate);
-      const normalizedOriginal = this.normalizeAddressForComparison(originalInput);
-      
-      if (standardizedInput !== normalizedOriginal) {
+      const hasCorrections = this.hasAddressCorrections(originalInput, candidate);
+      if (hasCorrections) {
         return 'corrected';
       }
     }
@@ -202,7 +186,7 @@ export class SmartyAddressProvider implements ValidationProviderAdapter {
     return baseStatus;
   }
 
-  private mapToStandardizedAddress(candidate: SmartyStreets.usStreet.Candidate): StandardizedAddress {
+  private mapToValidatedAddress(candidate: SmartyStreets.usStreet.Candidate): ValidatedAddress {
     const components = candidate.components;
     
     return {
@@ -210,10 +194,7 @@ export class SmartyAddressProvider implements ValidationProviderAdapter {
       number: components.primaryNumber || '',
       city: components.cityName || '',
       state: components.state || '',
-      zipcode: components.zipCode + (components.plus4Code ? `-${components.plus4Code}` : ''),
-      deliveryLine1: candidate.deliveryLine1 || '',
-      deliveryLine2: candidate.deliveryLine2 || undefined,
-      lastLine: candidate.lastLine || ''
+      zipcode: components.zipCode + (components.plus4Code ? `-${components.plus4Code}` : '')
     };
   }
 
@@ -228,29 +209,19 @@ export class SmartyAddressProvider implements ValidationProviderAdapter {
     return parts.join(' ');
   }
 
-  private extractCorrections(
-    original: string,
-    candidate: SmartyStreets.usStreet.Candidate
-  ): AddressCorrection[] {
-    const corrections: AddressCorrection[] = [];
+
+  private hasAddressCorrections(originalInput: string, candidate: SmartyStreets.usStreet.Candidate): boolean {
+    // Create a full standardized address from Smarty response
+    const standardizedFull = candidate.deliveryLine1 + 
+      (candidate.deliveryLine2 ? ` ${candidate.deliveryLine2}` : '') + 
+      `, ${candidate.lastLine}`;
     
-    // This is a simplified correction extraction
-    // In a full implementation, you would parse the original address
-    // and compare each component with the standardized version
-    
-    const standardizedFull = candidate.deliveryLine1 + (candidate.deliveryLine2 ? ` ${candidate.deliveryLine2}` : '') + `, ${candidate.lastLine}`;
-    const normalizedOriginal = this.normalizeAddressForComparison(original);
+    // Normalize both addresses for comparison
+    const normalizedOriginal = this.normalizeAddressForComparison(originalInput);
     const normalizedStandardized = this.normalizeAddressForComparison(standardizedFull);
     
-    if (normalizedOriginal !== normalizedStandardized) {
-      corrections.push({
-        field: 'address',
-        original: original,
-        corrected: standardizedFull
-      });
-    }
-    
-    return corrections;
+    // Check if there are significant differences
+    return normalizedOriginal !== normalizedStandardized;
   }
 
   private formatAddressForComparison(candidate: SmartyStreets.usStreet.Candidate): string {
